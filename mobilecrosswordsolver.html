@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Crossword Solver</title>
+  <meta name="description" content="Crossword solver optimised for mobile devices">
+   
+   
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fastclick/1.0.6/fastclick.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.5.7/angular.min.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.5.7/angular-animate.min.js"></script>
+  
+  <script src="popeye.js"></script> 
+  <link rel="stylesheet" href="popeye.css" />
+
+  <script src="ngNotificationsBar.min.js"></script>
+  <link rel="stylesheet" href="ngNotificationsBar.min.css">
+
+  <script src="wordlist.js"></script>
+  
+  <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-82843463-1', 'auto');
+    ga('send', 'pageview');
+  </script>
+</head>
+
+<body ng-app="mobileCrosswordSolver">
+  <script>
+    var app = angular.module("mobileCrosswordSolver", ["pathgather.popeye", "ngAnimate", "ngNotificationsBar"]);
+    
+    app.directive('focusOn', ['$timeout',
+      function ($timeout) {
+        return {            
+          restrict: "A",
+          link: function (scope, element, attrs, ctrls) {
+            scope.$watch(attrs.focusOn, function (currentValue, lastValue) {
+              if(currentValue == true) {
+                $timeout(function() {                                                
+                  element[0].focus();
+                }, 50);
+              }
+            });
+          }
+        };
+      }
+    ]);
+    
+    app.controller('MobController', ['$scope', '$timeout', '$http', '$window', 'Popeye', 'notifications', function($scope, $timeout, $http, $window, Popeye, notifications) {
+        $scope.numletters = 6
+        $scope.word = {};
+        $scope.query = '';
+        $scope.dic = getDict();
+        $scope.resulttext = [];
+        $scope.focusTarget = -1;
+
+        $scope.tdivStyle = 
+        {
+          "text-align" : "center",
+          "padding" : "10px 0px 10px 0px",
+        };
+        $scope.bdivStyle = 
+        {
+          "text-align" : "center",
+          "padding" : "8px 0px 8px 0px"
+        };
+        $scope.ldivStyle = 
+        {
+          "text-align" : "left",
+          "padding" : "16px 0px 16px 0px"
+        };
+        $scope.rdivStyle = 
+        {
+          "text-align" : "center",
+          "padding" : "0px 0px 10px 0px"
+        };
+        $scope.introDivStyle = 
+        {
+          "text-align" : "left",
+          "padding" : "0px 0px 0px 0px",
+          "margin" : "0px 0px 0px 0px",
+          "display" : ""
+        };
+        $scope.titleStyle = 
+        {
+          "text-align" : "center",
+          "margin" : "0px 0px 0px 0px",
+          "font-family" : "sans-serif",
+          "font-size" : "26px",
+          "color": "#43519E"
+        };
+        $scope.footerStyle = 
+        {
+          "text-align" : "center",
+          "padding" : "20px 0px 10px 0px",
+          "color": "#999999",
+          "font-family" : "sans-serif",
+          "font-size" : "10px"
+        };
+        $scope.footerLinkStyle = 
+        {
+          "color": "#666666",
+        };
+        $scope.buttonStyle = 
+        {
+          "-webkit-appearance": "none",
+          "padding" : "8px 16px 12px 16px",
+          "margin" : "0px 2px 0px 2px",
+          "font-size" : "14px",
+          "font-family" : "sans-serif",
+          "height": "36px",
+          "line-height": "18px",
+          "border-style": "solid",
+          "border-width": "1px",
+          "border-color": "#333333",
+          "border-radius": "5px",
+          "background-color": "#43519E",
+          "color": "#EEEEEE"
+        };
+        $scope.inputStyle = 
+        {
+          "text-align" : "center",
+          "text-transform" : "uppercase",
+          "font-size" : "30px",
+          "border-style": "solid",
+          "border-width": "1px",
+          "border-color": "#333333",
+          "width" : "36px",
+          "height" : "36px",
+          "padding" : "4px 4px 4px 4px",
+          "margin" : "0px 0px 4px 0px",
+          "background-color": "#DDE1F9"
+        };
+        $scope.resStyle = 
+        {
+          "align" : "center",
+          "font-size" : "14px"
+        };
+        $scope.introStyle = 
+        {
+          "font-size" : "14px",
+          "font-family" : "sans-serif",
+          "padding" : "0px 0px 0px 0px",
+          "margin" : "0px 0px 0px 0px",
+          "color": "#333333"
+        };
+        $scope.introStyleCenter = 
+        {
+          "font-size" : "14px",
+          "font-family" : "sans-serif",
+          "padding" : "0px 0px 0px 0px",
+          "margin" : "0px 0px 0px 0px",
+          "color": "#333333",
+          "text-align" : "center"
+        };
+        $scope.hiddenbuttonStyle = 
+        {
+          "width" : "1px",
+          "height" : "1px",
+          "visibility" : "hidden",
+          "position": "absolute"
+        };
+    
+        $scope.keypress = function($event, focusTargetID) {
+          var kc = $event.keyCode;
+          if (!( ((kc>=97)&&(kc<=122)) || ((kc>=65)&&(kc<=90)) ))  // uppercase or lowercase letter
+            $event.preventDefault();
+
+          if (focusTargetID > $scope.numletters)
+            $scope.timer = $timeout(function(){document.activeElement.blur();}, 50);
+          else
+            $scope.focusTarget = focusTargetID;
+        };
+        
+        $scope.keydown = function($event, focusTargetID) {
+          if ($event.keyCode === 8) 
+            $scope.focusTarget = focusTargetID;
+        }
+        
+        $scope.parseFindBaseWord = function(response) {
+          // check if the returned definition references another word
+          var defn = "";
+          for (var i=0; i<response.data.length; i++)
+            defn = defn + response.data[i].text.toLowerCase() + " ";
+          
+          var re;
+          re = /plural form of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+          
+          re = /comparative form of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /superlative form of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /past participle of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /simple past of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /present indicative form of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /present indicative of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /present participle of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /simple present form of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /alternative spelling of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          re = /british   variant of (\w+)/;
+          if (defn.match(re)!==null)
+            return defn.match(re)[1];
+
+          // no base reference found in the definition
+          return "";
+        }
+        
+        $scope.formatWordResponse = function(response)
+        {
+          var res = response.data[0].word.toUpperCase()+"<br><br>";
+          for (var i=0; i<response.data.length; i++)
+          {
+            var pos = response.data[i].partOfSpeech;
+            if (pos.toLowerCase().substring(0,4)==="verb")
+              pos = "verb";
+            res = res + "("+pos+") " + response.data[i].text + "<br><br>";
+          }
+          return res;
+        };
+        
+        $scope.resultClick = function(n) {
+          var requestword = $scope.resulttext[n].trim().toLowerCase();
+          var url="http://api.wordnik.com/v4/word.json/"+requestword+"/definitions?limit=20&includeRelated=false&sourceDictionaries=ahd,wiktionary,webster,century,wordnet&useCanonical=false&includeTags=false&api_key=71f912e922285b9e9c25605169e0858731cac6d31758783f9";
+          $http.get(url).then(
+            function(response) {
+              if (response.data.length>0)
+              {
+                var baseword = $scope.parseFindBaseWord(response);
+                if (baseword.length===0)
+                {
+                  // definition doesn't reference another word.  No need for second request.
+                  $scope.openModal($scope.formatWordResponse(response));
+                }
+                else
+                {
+                  // definition references another word, so we request the second word as well and display both answers
+                  url="http://api.wordnik.com/v4/word.json/"+baseword+"/definitions?limit=20&includeRelated=false&sourceDictionaries=ahd,wiktionary,webster,century,wordnet&useCanonical=false&includeTags=false&api_key=71f912e922285b9e9c25605169e0858731cac6d31758783f9";
+                  $http.get(url).then(function(response2){
+                    if (response2.data.length>0)
+                    {
+                      // success - display both words
+                      $scope.openModal($scope.formatWordResponse(response)+"<br><br>"+$scope.formatWordResponse(response2));
+                    }
+                    else
+                    {
+                    // API or web error occurred for the second word - just display first word
+                      $scope.openModal($scope.formatWordResponse(response));
+                    }
+                  },
+                  function(response2) {
+                    // API or web error occurred for the second word - just display first word
+                    $scope.openModal($scope.formatWordResponse(response));
+                  });
+                }
+              }
+              else
+              {
+                // API or web error occurred for the first word - display an error message
+                notifications.showError({message: 'Unable to find definition of '+requestword, hide: true});
+              }
+            },
+            function(response) {
+              // API or web error occurred for the first word - display an error message
+              notifications.showError({message: 'Unable to find definition of '+requestword, hide: true});
+            });
+        };
+    
+    
+        $scope.singleChar = function(c) {
+          if (c == '')
+            return '?';
+          else
+            return c.toUpperCase();
+        };
+        
+        $scope.matchWord = function(q,w) {
+          if (q.length != w.length)
+            return false;
+          if (w.length == 0)
+            return false;
+          for (var i=0; i<w.length; i++)
+            if ((q[i]!='?') && (q[i]!=w[i]))
+              return false;
+          return true;
+        };
+        
+        $scope.filterDictionary = function() {
+          var res=[];
+          var l = $scope.query.length;
+          var numwords = $scope.dic[l].length;
+          if ((l>0) && (l<16))
+          {
+            for (var i=0; i<numwords; i++)
+            {
+              if ( $scope.matchWord( $scope.query, $scope.dic[l][i].toUpperCase() ) )
+                res.push($scope.dic[l][i]);
+              if (res.length>500)
+                break;
+            }
+          }
+          return res;
+        };
+        
+        $scope.wordChange = function() {
+          $scope.query = $scope.singleChar($scope.word.c1) +
+            $scope.singleChar($scope.word.c2) +
+            $scope.singleChar($scope.word.c3) +
+            $scope.singleChar($scope.word.c4) +
+            $scope.singleChar($scope.word.c5) +
+            $scope.singleChar($scope.word.c6) +
+            $scope.singleChar($scope.word.c7) +
+            $scope.singleChar($scope.word.c8) +
+            $scope.singleChar($scope.word.c9) +
+            $scope.singleChar($scope.word.c10) +
+            $scope.singleChar($scope.word.c11) +
+            $scope.singleChar($scope.word.c12) +
+            $scope.singleChar($scope.word.c13) +
+            $scope.singleChar($scope.word.c14) +
+            $scope.singleChar($scope.word.c15);
+          $scope.query = $scope.query.substring(0, $scope.numletters);
+          var nullquery = Array($scope.numletters+1).join("?");
+          if (nullquery===$scope.query)
+          {
+            $scope.introDivStyle["display"]="";
+            $scope.resulttext = []
+          }
+          else
+          {
+            $scope.introDivStyle["display"]="none";
+            var wordlist=$scope.filterDictionary();
+            if (wordlist.length>0)
+            {
+              $scope.resulttext = []
+              for (i=0; i<wordlist.length; i++)
+                $scope.resulttext.push(" "+wordlist[i]);
+              if (wordlist.length>=50)
+                  $scope.resStyle["font-size"]="14px";
+              if (wordlist.length<50)
+                  $scope.resStyle["font-size"]="20px";
+              if (wordlist.length<=10)
+                  $scope.resStyle["font-size"]="26px";
+            }
+            else
+            {
+              $scope.resStyle["font-size"]="26px";
+              $scope.resulttext = ["(no matching words)"];
+            }
+          }
+        };
+        $scope.lessLetters = function() {
+          if ($scope.numletters > 2)
+            $scope.numletters = $scope.numletters - 1;
+          $scope.wordChange();
+        };
+        $scope.moreLetters = function() {
+          if ($scope.numletters < 15)
+            $scope.numletters = $scope.numletters + 1;
+          $scope.wordChange();
+        };
+        $scope.resetLetters = function() {
+          $scope.word.c1 = '';
+          $scope.word.c2 = '';
+          $scope.word.c3 = '';
+          $scope.word.c4 = '';
+          $scope.word.c5 = '';
+          $scope.word.c6 = '';
+          $scope.word.c7 = '';
+          $scope.word.c7 = '';
+          $scope.word.c8 = '';
+          $scope.word.c9 = '';
+          $scope.word.c10 = '';
+          $scope.word.c11 = '';
+          $scope.word.c12 = '';
+          $scope.word.c13 = '';
+          $scope.word.c14 = '';
+          $scope.word.c15 = '';
+          $scope.wordChange();
+        };
+        $scope.range = function(min, max, step) {
+          step = step || 1;
+          var input = [];
+          for (var i = min; i <= max; i += step) {
+            input.push(i);
+          }
+          return input;
+        };
+        
+        $scope.openModal = function(text) {
+          var modal = Popeye.openModal({
+            template: '<div class="popeye-modal-container" ng-click="$close()"><div class="popeye-modal"><a class="popeye-close-modal" href ng-click="$close()"></a><p>'+text+'</p></div></div>'
+          });
+        };
+      
+        $scope.resetLetters();
+      }]);
+      
+    app.run(function() {
+        FastClick.attach(document.body);
+    });
+  </script>
+
+
+  <form ng-controller="MobController">
+    <div ng-style="tdivStyle">
+        <p ng-style="titleStyle">Mobile Crossword Solver</p>
+    </div>
+    <div ng-style="bdivStyle">
+        <button ng-style="hiddenbuttonStyle"></button>
+        <button ng-style="buttonStyle" ng-click="lessLetters()">&#8592; Less</button>
+        <button ng-style="buttonStyle" ng-click="resetLetters()">Clear</button>
+        <button ng-style="buttonStyle" ng-click="moreLetters()">More &#8594;</button>
+    </div>
+    <div ng-style="ldivStyle">
+        <input autocorrect="off" focus-on="focusTarget===1" type="text" placeholder="1" maxlength=1 ng-trim="false" ng-model="word.c1" ng-style="inputStyle" ng-focus="word.c1='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event)" ng-keypress="keypress($event,2)" ng-show="numletters>=1">
+        <input autocorrect="off" focus-on="focusTarget===2" type="text" placeholder="2" maxlength=1 ng-trim="false" ng-model="word.c2" ng-style="inputStyle" ng-focus="word.c2='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,1)" ng-keypress="keypress($event,3)" ng-show="numletters>=2">
+        <input autocorrect="off" focus-on="focusTarget===3" type="text" placeholder="3" maxlength=1 ng-trim="false" ng-model="word.c3" ng-style="inputStyle" ng-focus="word.c3='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,2)" ng-keypress="keypress($event,4)" ng-show="numletters>=3">
+        <input autocorrect="off" focus-on="focusTarget===4" type="text" placeholder="4" maxlength=1 ng-trim="false" ng-model="word.c4" ng-style="inputStyle" ng-focus="word.c4='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,3)" ng-keypress="keypress($event,5)" ng-show="numletters>=4">
+        <input autocorrect="off" focus-on="focusTarget===5" type="text" placeholder="5" maxlength=1 ng-trim="false" ng-model="word.c5" ng-style="inputStyle" ng-focus="word.c5='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,4)" ng-keypress="keypress($event,6)" ng-show="numletters>=5">
+        <input autocorrect="off" focus-on="focusTarget===6" type="text" placeholder="6" maxlength=1 ng-trim="false" ng-model="word.c6" ng-style="inputStyle" ng-focus="word.c6='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,5)" ng-keypress="keypress($event,7)" ng-show="numletters>=6">
+        <input autocorrect="off" focus-on="focusTarget===7" type="text" placeholder="7" maxlength=1 ng-trim="false" ng-model="word.c7" ng-style="inputStyle" ng-focus="word.c7='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,6)" ng-keypress="keypress($event,8)" ng-show="numletters>=7">
+        <input autocorrect="off" focus-on="focusTarget===8" type="text" placeholder="8" maxlength=1 ng-trim="false" ng-model="word.c8" ng-style="inputStyle" ng-focus="word.c8='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,7)" ng-keypress="keypress($event,9)" ng-show="numletters>=8">
+        <input autocorrect="off" focus-on="focusTarget===9" type="text" placeholder="9" maxlength=1 ng-trim="false" ng-model="word.c9" ng-style="inputStyle" ng-focus="word.c9='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,8)" ng-keypress="keypress($event,10)" ng-show="numletters>=9">
+        <input autocorrect="off" focus-on="focusTarget===10" type="text" placeholder="10" maxlength=1 ng-trim="false" ng-model="word.c10" ng-style="inputStyle" ng-focus="word.c10='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,9)" ng-keypress="keypress($event,11)" ng-show="numletters>=10">
+        <input autocorrect="off" focus-on="focusTarget===11" type="text" placeholder="11" maxlength=1 ng-trim="false" ng-model="word.c11" ng-style="inputStyle" ng-focus="word.c11='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,10)" ng-keypress="keypress($event,12)" ng-show="numletters>=11">
+        <input autocorrect="off" focus-on="focusTarget===12" type="text" placeholder="12" maxlength=1 ng-trim="false" ng-model="word.c12" ng-style="inputStyle" ng-focus="word.c12='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,11)" ng-keypress="keypress($event,13)" ng-show="numletters>=12">
+        <input autocorrect="off" focus-on="focusTarget===13" type="text" placeholder="13" maxlength=1 ng-trim="false" ng-model="word.c13" ng-style="inputStyle" ng-focus="word.c13='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,12)" ng-keypress="keypress($event,14)" ng-show="numletters>=13">
+        <input autocorrect="off" focus-on="focusTarget===14" type="text" placeholder="14" maxlength=1 ng-trim="false" ng-model="word.c14" ng-style="inputStyle" ng-focus="word.c14='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,13)" ng-keypress="keypress($event,15)" ng-show="numletters>=14">
+        <input autocorrect="off" focus-on="focusTarget===15" type="text" placeholder="15" maxlength=1 ng-trim="false" ng-model="word.c15" ng-style="inputStyle" ng-focus="word.c15='';wordChange();focusTarget=''" ng-change="wordChange();" ng-keydown="keydown($event,14)" ng-keypress="keypress($event,16)" ng-show="numletters>=15">
+    </div>
+    <div ng-style="introDivStyle" ng-click="document.activeElement.blur();">
+        <p ng-style="introStyleCenter">Welcome to Mobile Crossword Solver.<br><br>The simplest and fastest crossword solver, designed for mobile devices.</p>
+        <br>
+        <p ng-style="introStyle">Instructions:<br>(1) touch 'Less' and 'More' to set the word length<br>(2) touch a letter box to enter a known letter<br>(3) touch a result word for the dictionary</p>
+        <br><br>
+        <p ng-style="introStyleCenter">Good luck!</p>
+    </div>
+    <div ng-style="rdivStyle" ng-click="document.activeElement.blur();">
+        <code ng-repeat="n in range(0,500)" ng-click="resultClick(n);" ng-style="resStyle">{{resulttext[$index]}}</code>
+    </div>
+    <footer ng-style="footerStyle"  ng-click="document.activeElement.blur();">
+        <p> &copy; 2016 Mobile Crossword Solver.  All Rights Reserved.  Mobile Crossword Solver owned and operated by <a ng-style="footerLinkStyle" href="mailto:roblevin66@gmail.com">Rob Levin</a> </p>
+    </footer>
+    
+    <notifications-bar class="notifications"></notifications-bar>
+</body>
+
+</html>
